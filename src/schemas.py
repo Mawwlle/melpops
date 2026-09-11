@@ -1,9 +1,8 @@
 """Pydantic-контракты API приложения."""
 
-from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class LivenessResponse(BaseModel):
@@ -12,36 +11,29 @@ class LivenessResponse(BaseModel):
     status: str
 
 
-class ReportStatus(StrEnum):
-    """Общий статус приложения в health-отчёте."""
-
-    ok = "ok"
-    degraded = "degraded"
-    unhealthy = "unhealthy"
-
-
 class HealthStatus(StrEnum):
     """Статус отдельной зависимости."""
 
     healthy = "healthy"
     unavailable = "unavailable"
-    unhealthy = "unhealthy"
+
+
+class ReportStatus(StrEnum):
+    """Общий статус приложения в health-отчёте."""
+
+    ok = "ok"
+    degraded = "degraded"
 
 
 class DependencyHealth(BaseModel):
-    """Здоровье одной зависимости: статус, ошибка, время проверки, метаданные."""
+    """Здоровье одной зависимости: статус и человекочитаемая деталь."""
 
     status: HealthStatus
-    error: str | None = None
-    # 0.0 — проверка ещё не замерена; run_check подставит реальное значение
-    response_time_ms: float = 0.0
-    metadata: dict[str, str] = Field(default_factory=dict)
+    detail: str | None = None
 
 
 class HealthReport(BaseModel):
-    """Сводный health-отчёт приложения и его зависимостей."""
+    """Сводный health-отчёт: общий статус и статус каждой зависимости."""
 
     status: ReportStatus
-    timestamp: datetime
-    response_time_ms: float
-    dependency_health: dict[str, DependencyHealth]
+    dependencies: dict[str, DependencyHealth]

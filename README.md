@@ -213,20 +213,14 @@ Docker и оркестраторам: "процесс не умер, не зав
 ```json
 {
   "status": "degraded",
-  "timestamp": "2026-09-09T22:06:54.393560Z",
-  "response_time_ms": 28.582,
-  "dependency_health": {
+  "dependencies": {
     "application": {
       "status": "healthy",
-      "error": null,
-      "response_time_ms": 0.088,
-      "metadata": { "version": "0.1.0", "environment": "development" }
+      "detail": "melpops 0.1.0 (development)"
     },
     "postgres": {
       "status": "unavailable",
-      "error": "InvalidCatalogNameError: database \"melpops\" does not exist",
-      "response_time_ms": 27.689,
-      "metadata": {}
+      "detail": "InvalidCatalogNameError: database \"melpops\" does not exist"
     }
   }
 }
@@ -236,23 +230,24 @@ Docker и оркестраторам: "процесс не умер, не зав
 
 - **приложение стартует без БД.** Пул создаётся с `min_size=0`, и health
   честно сообщает о деградации, вместо того чтобы не поднять процесс;
-- **проверки параллельны** (`asyncio.gather`), каждая со своим таймаутом;
-- **одна упавшая проверка не роняет отчёт** — её статус становится
-  `unavailable` с текстом ошибки (`error` — стабильный контракт, технические
-  детали, которые важны дежурному);
+- **упавшая проверка не роняет отчёт** — `check_postgres` ловит ошибку
+  коннекта и превращает её в статус `unavailable` с текстом в `detail`
+  (человекочитаемая деталь для дежурного, а не 500 всего эндпоинта);
 - **зависимости добавляются как функции**: появилась S3 — написали
-  `check_s3` и добавили её в словарь проверок, контракт ответа не меняется.
+  `check_s3`, добавили строку в словарь `build_report`, контракт ответа
+  не меняется.
 
-Статусы: общий — `ok | degraded`, на зависимость — `healthy | unavailable | unhealthy`.
-`unavailable` — не коннектится/не сконфигурен, `unhealthy` — коннект есть, но
-что-то не так.
+Специально **без обобщений**: две проверки — это две функции и словарь из
+двух строк, а не универсальный «движок проверок» с таймаутами и реестром
+коллбэков. Абстракцию вводят, когда зависимостей становится много, а не
+заранее. Статусы: общий — `ok | degraded`, на зависимость — `healthy | unavailable`.
 
 ### Тесты
 
 ```shell
 ➜  melpops git:(master) ✗ uv run pytest -q
-.........                                                                [100%]
-9 passed in 0.03s
+.......                                                                  [100%]
+7 passed in 0.02s
 ```
 
 Три вещи, на которые стоит обратить внимание:
@@ -263,7 +258,7 @@ Docker и оркестраторам: "процесс не умер, не зав
    сценарий "БД недоступна" воспроизводится всегда.
 2. **Фикстура `client`** оборачивает приложение в `LifespanManager` из
    `asgi-lifespan`: ASGITransport сам по себе не запускает lifespan, а у нас
-   в lifespan создаётся пул БД и собирается `build_health_report`.
+   в lifespan создаётся пул БД, который нужен health-эндпоинту.
 3. **Имя теста — сценарий:** `test_health_report_degraded_when_postgres_unavailable`.
    Через полгода это читаемее, чем `test_health_2`.
 
@@ -381,20 +376,14 @@ CMD ["uv", "run", "uvicorn", "src.app:app", "--host", "0.0.0.0", "--port", "8000
 ➜  melpops git:(master) ✗ curl -s http://localhost:8000/api/v1/health | python3 -m json.tool
 {
   "status": "ok",
-  "timestamp": "2026-09-09T22:40:12.034512Z",
-  "response_time_ms": 4.312,
-  "dependency_health": {
+  "dependencies": {
     "application": {
       "status": "healthy",
-      "error": null,
-      "response_time_ms": 0.102,
-      "metadata": { "version": "0.1.0", "environment": "development" }
+      "detail": "melpops 0.1.0 (development)"
     },
     "postgres": {
       "status": "healthy",
-      "error": null,
-      "response_time_ms": 4.055,
-      "metadata": { "version": "PostgreSQL 16.9" }
+      "detail": "PostgreSQL 16.9 on x86_64-pc-linux-musl"
     }
   }
 }
@@ -438,11 +427,4 @@ make up                # весь стек в docker
 ```
 
 Swagger — на `http://localhost:8000/docs`.
-
-### Что дальше
-
-Скелет готов под нагрузку. Логичное продолжение курса: Alembic-миграции,
-настоящий домен (CRUD-ресурс с репозиторием), аутентификация, пуш образа в
-реестр и деплой. Но сначала — домашнее: добавить свою зависимость в
-health-отчёт и прогнать весь цикл (код → тест → pre-commit → CI).
 

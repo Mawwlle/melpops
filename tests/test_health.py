@@ -14,7 +14,6 @@ async def test_health_report_degraded_when_postgres_unavailable(client) -> None:
     assert response.status_code == 503
     body = response.json()
     assert body["status"] == "degraded"
-    assert body["dependency_health"]["postgres"]["status"] == "unavailable"
-    assert body["dependency_health"]["application"]["status"] == "healthy"
-    assert "version" in body["dependency_health"]["application"]["metadata"]
-    assert "environment" in body["dependency_health"]["application"]["metadata"]
+    assert body["dependencies"]["postgres"]["status"] == "unavailable"
+    assert body["dependencies"]["application"]["status"] == "healthy"
+    assert "melpops" in body["dependencies"]["application"]["detail"]

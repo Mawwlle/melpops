@@ -7,13 +7,12 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 ENV TZ=Europe/Moscow
 
-# Сначала манифесты: слой кэшируется, пока зависимости не меняются
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
 
 COPY src/ ./src/
 
-# Права: приложение не должно работать под root
+# Права: приложение не должно работать под root!
 RUN useradd --create-home appuser && chown -R appuser:appuser /app
 USER appuser
 

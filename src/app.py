@@ -9,13 +9,11 @@ import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
-import asyncpg
 from fastapi import FastAPI, Request
 from starlette.responses import Response
 
 from src import config, db, logging_config
 from src.api import health, hello
-from src.services import health as health_service
 
 log = logging.getLogger(__name__)
 
@@ -26,13 +24,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = config.get_settings()
     logging_config.setup_logging(settings.log_level)
     app.state.settings = settings
-    app.state.db_pool: asyncpg.Pool = await db.create_db_pool(settings)
-    app.state.build_health_report = lambda: health_service.build_health_report(
-        {
-            "application": lambda: health_service.check_application(settings),
-            "postgres": lambda: health_service.check_postgres(app.state.db_pool),
-        }
-    )
+    app.state.db_pool = await db.create_db_pool(settings)
     log.info(
         "Приложение %s v%s запущено (debug=%s)",
         settings.app_name,
